@@ -126,17 +126,21 @@ export async function isOwnerOnlyAcl(
   resourceUrl: string,
   ownerWebId: string,
 ): Promise<boolean> {
-  let store: Awaited<ReturnType<typeof parseRdf>>;
+  let dataset: Awaited<ReturnType<typeof parseRdf>>;
   try {
-    store = await parseRdf(aclBody, contentType, { baseIRI: aclBaseIri });
+    dataset = await parseRdf(aclBody, contentType, { baseIRI: aclBaseIri });
   } catch {
     // An unparseable ACL is NOT owner-private — fail closed.
     return false;
   }
+  // `parseRdf` returns a DatasetCore whose `match` compares terms by value
+  // (RDF/JS `.equals`), so externally-minted n3 NamedNodes match correctly.
+  const { DataFactory } = await import("n3");
+  const node = (iri: string) => DataFactory.namedNode(iri);
 
   // Every subject that is an acl:Authorization in the document.
   const authorizations = new Set<string>();
-  for (const q of store.match(null, asNode(store, RDF_TYPE), asNode(store, ACL_AUTHORIZATION))) {
+  for (const q of dataset.match(null, node(RDF_TYPE), node(ACL_AUTHORIZATION))) {
     authorizations.add(q.subject.value);
   }
   if (authorizations.size === 0) return false;
@@ -144,29 +148,31 @@ export async function isOwnerOnlyAcl(
   // Hard reject: ANY agentClass or agentGroup grant anywhere in the document
   // means the ACL is not owner-only (regardless of which authorization it sits
   // on). This catches foaf:Agent / acl:AuthenticatedAgent and any other class.
-  for (const _ of store.match(null, asNode(store, ACL_AGENT_CLASS), null)) {
+  for (const _ of dataset.match(null, node(ACL_AGENT_CLASS), null)) {
     return false;
   }
-  for (const _ of store.match(null, asNode(store, ACL_AGENT_GROUP), null)) {
+  for (const _ of dataset.match(null, node(ACL_AGENT_GROUP), null)) {
     return false;
   }
 
   // Hard reject: ANY acl:agent that is not exactly the owner WebID.
-  for (const q of store.match(null, asNode(store, ACL_AGENT), null)) {
+  for (const q of dataset.match(null, node(ACL_AGENT), null)) {
     if (q.object.value !== ownerWebId) return false;
   }
 
   // POSITIVE: there must exist an authorization where the owner holds R/W/C on
   // accessTo for the resource, AND one where the owner holds R/W/C on default.
   const accessToOk = authorizationGrantsOwner(
-    store,
+    dataset,
+    node,
     authorizations,
     ownerWebId,
     ACL_ACCESS_TO,
     resourceUrl,
   );
   const defaultOk = authorizationGrantsOwner(
-    store,
+    dataset,
+    node,
     authorizations,
     ownerWebId,
     ACL_DEFAULT,
@@ -175,26 +181,30 @@ export async function isOwnerOnlyAcl(
   return accessToOk && defaultOk;
 }
 
+/** A NamedNode factory bound to the dataset's term equality. */
+type NodeFactory = (iri: string) => import("@rdfjs/types").NamedNode;
+
 /**
  * Does some authorization in `authorizations` grant `ownerWebId` ALL of
  * Read+Write+Control, scoped to `resourceUrl` via `scopePredicate`
  * (acl:accessTo or acl:default)?
  */
 function authorizationGrantsOwner(
-  store: Awaited<ReturnType<typeof parseRdf>>,
+  dataset: Awaited<ReturnType<typeof parseRdf>>,
+  node: NodeFactory,
   authorizations: Set<string>,
   ownerWebId: string,
   scopePredicate: string,
   resourceUrl: string,
 ): boolean {
   for (const subject of authorizations) {
-    const subjNode = asNode(store, subject);
+    const subjNode = node(subject);
     // The authorization must name the owner as agent.
-    if (!hasObject(store, subjNode, ACL_AGENT, ownerWebId)) continue;
+    if (!hasObject(dataset, node, subjNode, ACL_AGENT, ownerWebId)) continue;
     // …and be scoped to the resource via the requested predicate.
-    if (!hasObject(store, subjNode, scopePredicate, resourceUrl)) continue;
+    if (!hasObject(dataset, node, subjNode, scopePredicate, resourceUrl)) continue;
     // …and carry ALL required modes.
-    if (REQUIRED_MODES.every((m) => hasObject(store, subjNode, ACL_MODE, m))) {
+    if (REQUIRED_MODES.every((m) => hasObject(dataset, node, subjNode, ACL_MODE, m))) {
       return true;
     }
   }
@@ -203,27 +213,16 @@ function authorizationGrantsOwner(
 
 /** Does subject have predicate → object (by IRI string)? */
 function hasObject(
-  store: Awaited<ReturnType<typeof parseRdf>>,
-  subject: ReturnType<typeof asNode>,
+  dataset: Awaited<ReturnType<typeof parseRdf>>,
+  node: NodeFactory,
+  subject: import("@rdfjs/types").NamedNode,
   predicate: string,
   object: string,
 ): boolean {
-  for (const _ of store.match(subject, asNode(store, predicate), asNode(store, object))) {
+  for (const _ of dataset.match(subject, node(predicate), node(object))) {
     return true;
   }
   return false;
-}
-
-/** Build a NamedNode for an IRI using the store's data factory. */
-function asNode(
-  store: Awaited<ReturnType<typeof parseRdf>>,
-  iri: string,
-): import("@rdfjs/types").NamedNode {
-  // n3.Store carries a DataFactory; use it so terms compare equal in match().
-  // `dataFactory` is the public field on n3.Store.
-  const factory = (store as unknown as { dataFactory: import("@rdfjs/types").DataFactory })
-    .dataFactory;
-  return factory.namedNode(iri);
 }
 
 /**
