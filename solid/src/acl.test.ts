@@ -293,6 +293,51 @@ describe("isOwnerOnlyAcl — POSITIVE validation + reject foreign/agentClass", (
       await isOwnerOnlyAcl("@@ this is not turtle @@", "text/turtle", aclBase, CONTAINER, OWNER),
     ).toBe(false);
   });
+
+  it("ACCEPTS an owner grant SPLIT across two authorizations (accessTo on one, default on another)", async () => {
+    // Both authorizations name ONLY the owner — still owner-only.
+    const acl = `
+@prefix acl: <http://www.w3.org/ns/auth/acl#>.
+<#a> a acl:Authorization;
+  acl:agent <${OWNER}>;
+  acl:accessTo <${CONTAINER}>;
+  acl:mode acl:Read, acl:Write, acl:Control.
+<#b> a acl:Authorization;
+  acl:agent <${OWNER}>;
+  acl:default <${CONTAINER}>;
+  acl:mode acl:Read, acl:Write, acl:Control.`;
+    expect(await isOwnerOnlyAcl(acl, "text/turtle", aclBase, CONTAINER, OWNER)).toBe(true);
+  });
+
+  it("acl:origin does NOT bypass owner-only enforcement (a foreign-agent+origin grant is rejected)", async () => {
+    // acl:origin only NARROWS an existing agent grant — it is not itself a grant.
+    // A foreign agent restricted by origin is still a foreign-agent grant → reject.
+    const acl = `
+@prefix acl: <http://www.w3.org/ns/auth/acl#>.
+<#owner> a acl:Authorization;
+  acl:agent <${OWNER}>;
+  acl:accessTo <${CONTAINER}>;
+  acl:default <${CONTAINER}>;
+  acl:mode acl:Read, acl:Write, acl:Control.
+<#app> a acl:Authorization;
+  acl:agent <https://app.evil.example/card#me>;
+  acl:origin <https://app.evil.example>;
+  acl:accessTo <${CONTAINER}>;
+  acl:mode acl:Read.`;
+    expect(await isOwnerOnlyAcl(acl, "text/turtle", aclBase, CONTAINER, OWNER)).toBe(false);
+  });
+
+  it("REJECTS a public-class grant even when there is no owner authorization at all", async () => {
+    const acl = `
+@prefix acl: <http://www.w3.org/ns/auth/acl#>.
+@prefix foaf: <http://xmlns.com/foaf/0.1/>.
+<#public> a acl:Authorization;
+  acl:agentClass foaf:Agent;
+  acl:accessTo <${CONTAINER}>;
+  acl:default <${CONTAINER}>;
+  acl:mode acl:Read.`;
+    expect(await isOwnerOnlyAcl(acl, "text/turtle", aclBase, CONTAINER, OWNER)).toBe(false);
+  });
 });
 
 // Sanity: confirm vi is genuinely used somewhere so the import is not dead.
