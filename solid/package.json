@@ -1,0 +1,35 @@
+{
+  "name": "miniflux-solid-sync",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Solid pod-sync integration layer for the Miniflux fork — maps saved RSS/Atom entries into a user's Solid pod as owner-private chat-interop CanonicalMessages, mirrors read/starred state to a pod KV, and self-describes as a federation member.",
+  "scripts": {
+    "lint": "biome check src public",
+    "lint:fix": "biome check --write src public",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "tsc",
+    "gate": "npm run lint && npm run typecheck && npm run test",
+    "check:lockfile-transport": "node scripts/check-lockfile-transport.mjs"
+  },
+  "dependencies": {
+    "@jeswr/fetch-rdf": "^0.1.0",
+    "@jeswr/federation-registry": "github:jeswr/federation-registry#main",
+    "@jeswr/solid-chat-interop": "github:jeswr/solid-chat-interop#main",
+    "@jeswr/solid-granary": "github:jeswr/solid-granary#main",
+    "@jeswr/solid-session-restore": "github:jeswr/solid-session-restore#main",
+    "@jeswr/unstorage-solid": "github:jeswr/unstorage-solid#main",
+    "n3": "^2.0.3",
+    "unstorage": "^1.10.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.0",
+    "@rdfjs/types": "^2.0.1",
+    "@types/n3": "^1.26.1",
+    "@types/node": "^20",
+    "typescript": "^5",
+    "vitest": "^4.1.8"
+  }
+}

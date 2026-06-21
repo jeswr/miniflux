@@ -1,0 +1,30 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/solid/oidc-context.jsonld",
+    {
+      "fedapp": "https://w3id.org/jeswr/fed#",
+      "acl": "http://www.w3.org/ns/auth/acl#",
+      "ldp": "http://www.w3.org/ns/ldp#",
+      "sectors": "https://w3id.org/jeswr/sectors/",
+      "pc": "https://w3id.org/jeswr/pod-chat#",
+      "fedapp:sector": { "@type": "@id" },
+      "fedapp:access": { "@type": "@id" },
+      "fedapp:consumes": { "@type": "@id" },
+      "fedapp:produces": { "@type": "@id" },
+      "fedapp:declaresShape": { "@type": "@id" }
+    }
+  ],
+  "client_id": "https://miniflux-solid.example.example/clientid.jsonld",
+  "client_name": "Miniflux (Solid)",
+  "client_uri": "https://miniflux-solid.example.example/",
+  "redirect_uris": ["https://miniflux-solid.example.example/callback.html"],
+  "scope": "openid webid offline_access",
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none",
+  "@type": "fedapp:App",
+  "fedapp:sector": "sectors:social#sector",
+  "fedapp:access": ["acl:Read", "acl:Write", "acl:Append"],
+  "fedapp:consumes": ["ldp:Container", "ldp:Resource"],
+  "fedapp:produces": ["pc:ChatRoom", "ldp:Resource"]
+}
