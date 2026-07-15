@@ -1,0 +1,10 @@
+{
+  "$schema": "https://solid.example/suite-tracking/suite.schema.json",
+  "id": "miniflux",
+  "kind": "app",
+  "name": "Miniflux (Solid)",
+  "repo": "https://github.com/jeswr/miniflux",
+  "category": "media",
+  "maturity": "alpha",
+  "visibility": "public"
+}
